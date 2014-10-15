@@ -22,6 +22,7 @@ V_Y: .byte 0
 TIME: .word 0
 FROGS_EATEN: .byte 0
 FROGS_REMAINING: .byte 0
+IN_GAME: .byte 0
 GAME_WALLS:
     .ascii "****************************************  **********************"
     .ascii "*                                                              *"
@@ -91,11 +92,11 @@ GAME_WALLS:
 SPLASH_WALLS:
     .ascii "****************************************************************"
     .ascii "*        * *   *      *   *   *   *   *   *   *                *"
-    .ascii "*  *   *     *  *                                *             *"
-    .ascii "* *      *    * *             *   *             *              *"
-    .ascii "*       *     *  *           *  *  *       * *                **"
-    .ascii "*              * *             * *        *   *                *"
-    .ascii "*              *  *          *     *        *                  *"
+    .ascii "*  *   *     *  *                          * *   *             *"
+    .ascii "* *      *    * *             *   *       *   * *              *"
+    .ascii "*       *     *  *           *  *  *                          **"
+    .ascii "*              * *             * *                             *"
+    .ascii "*              *  *          *     *                           *"
     .ascii "*       *       * *         *  * *  *   *   *            *     *"
     .ascii "* *      *      *  *          *   *      * *  * *         *    *"
     .ascii "*  *  *          * *        *       *   *     *  *        *    *"
@@ -406,16 +407,19 @@ _init_walls:
 _init_frogs:
     # Initializes the board's frogs.
     # Makes one frog with total certainty; adds up to MAX_FROGS.
-    addi $sp, $sp, -16
+    # a0: The noninclusive upper bound for the row in which frogs should appear.
+    addi $sp, $sp, -20
     sw $ra, 0($sp)
     sw $s0, 4($sp)
     sw $s1, 8($sp)
     sw $s2, 12($sp)
-
+    sw $s3, 16($sp)
+    
+    move $s3, $a0
     .macro PLACE_FROG
         randint(64)                     # Generate a position.
         move $t0, $v0
-        randint(64)
+        randint($s3)
 
         move $t1, $v0
         tuple($t0, $t1) 
@@ -442,8 +446,14 @@ _init_frogs:
     lw $s0, 4($sp)
     lw $s1, 8($sp)
     lw $s2, 12($sp)
-    addi $sp, $sp, 16
+    lw $s3, 16($sp)
+    addi $sp, $sp, 20
     jr $ra
+
+.macro init_frogs (%row)
+    add $a0, $zero, %row
+    jal _init_frogs
+.end_macro
 
 _clear_row:
     # Turns off all cells in the specified row.
@@ -490,10 +500,14 @@ _clear_board:
     init_snake (31, 4, 8)
     la $a0, GAME_WALLS
     jal _init_walls
-    jal _init_frogs
+    init_frogs(BOARD_LEN)
+    addi $t0, $zero, 1
+    sb $t0, IN_GAME
 .end_macro
 
 _game_over:
+    lb $t0, IN_GAME
+    beq $t0, $zero, SPLASHING
     lw $t0, TIME
     PRINT_STR("Game over.\n")
     PRINT_STR("The playing time was ")
@@ -505,6 +519,7 @@ _game_over:
     PRINT_STR(" frogs.\n")
 
     done()
+    SPLASHING:
 
 .macro game_over ()
     jal _game_over
@@ -723,6 +738,17 @@ _display_splash:
     la $a0, SPLASH_WALLS
     jal _init_walls
     init_snake (17, 1, 62)
+    #init_frogs (16)
+    .macro FROG_LINE_1
+        tuple(1, $s0)
+        set_LED($v0, 3) 
+    .end_macro
+    .macro FROG_LINE_62
+        tuple(62, $s0)
+        set_LED($v0, 3) 
+    .end_macro
+    for($s0, 18, 60, FROG_LINE_1) 
+    for($s0, 18, 60, FROG_LINE_62) 
     SPLASH_BODY:
         sleep(SPLASH_MS)
         jal _handle_splash_press
