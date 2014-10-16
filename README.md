@@ -13,13 +13,13 @@ In pseudocode, it looks like this:
 
     t = sys.time()
     while True:
-      sleep(SMALL_INTERVAL)
-      if key_pressed(): # set new direction here; 
-                        # true if the direction has changed, else false
-        move_snake()
-        t = sys.time()
-      elif sys.time() - t > 200ms:
-        move_snake()
+        sleep(SMALL_INTERVAL)
+        if key_pressed(): # set new direction here; 
+                          # true if the direction has changed, else false
+            move_snake()
+            t = sys.time()
+        elif sys.time() - t > 200ms:
+            move_snake()
 
 The move\_snake() function was also fairly simple. Before making a move, it
 calls a validation function to check what's in the move destination. If the
