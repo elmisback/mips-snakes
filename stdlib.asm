@@ -6,6 +6,34 @@ j _END_OF_STDLIB
     syscall
 .end_macro    
 
+_time:
+    # Returns the system time in registers $v0 and $v1.
+    # $v0 = lo, $v1 = hi 32 bits.
+    addi $sp, $sp, -8
+    sw $a0, ($sp)
+    sw $a1, 4($sp)
+
+    la $v0, 30
+    syscall
+    move $v0, $a0
+    move $v1, $a1
+
+    lw $a0, ($sp)
+    lw $a1, 4($sp)
+    addi $sp, $sp, 8
+    jr $ra
+
+# No side effects, besides return values.
+.macro time ()
+    addi $sp, $sp, -4
+    sw $ra, ($sp)
+
+    jal _time 
+
+    lw $ra, ($sp)
+    addi $sp, $sp, 4
+.end_macro
+
 _randint:
     # Returns a random integer in a range in $v0.
     # a1: the upper bound for the range

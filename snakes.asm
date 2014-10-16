@@ -8,7 +8,8 @@
 .eqv BOARD_AREA     4096
 .eqv BOARD_LEN      64
 .eqv MAX_FROGS      32
-.eqv SLEEP_MS       200
+.eqv SLEEP_MS       5
+.eqv TIME_STEP      200
 .eqv SPLASH_MS      1
 .eqv Q_MASK         0x1FFF
 
@@ -404,6 +405,11 @@ _init_walls:
     addi $sp, $sp, 12
     jr $ra
 
+.macro init_walls (%wall_pointer)
+    la $a0, %wall_pointer
+    jal _init_walls
+.end_macro
+
 _init_frogs:
     # Initializes the board's frogs.
     # Makes one frog with total certainty; adds up to MAX_FROGS.
@@ -441,6 +447,8 @@ _init_frogs:
     add $s2, $zero, MAX_FROGS
     addi $s2, $s2, -1
     for($s1, 0, $s2, PLACE_FROG)
+
+    sb $zero, FROGS_EATEN
 
     lw $ra, 0($sp)
     lw $s0, 4($sp)
@@ -495,20 +503,27 @@ _clear_board:
     addi $sp, $sp, 8
     jr $ra
 
-.macro init_game ()
+.macro clear_board ()
     jal _clear_board
-    init_snake (31, 4, 8)
-    la $a0, GAME_WALLS
-    jal _init_walls
+.end_macro
+
+.macro init_game ()
+    clear_board()       # clear any previous animations
+    init_snake(31, 4, 8)   # initialize the snake in position
+    init_walls(GAME_WALLS)  # initialize the walls and frogs
     init_frogs(BOARD_LEN)
     addi $t0, $zero, 1
     sb $t0, IN_GAME
+    time()
+    sw $v0, TIME            # note the starting time
 .end_macro
 
 _game_over:
     lb $t0, IN_GAME
     beq $t0, $zero, SPLASHING
+    time()
     lw $t0, TIME
+    sub $t0, $v0, $t0 
     PRINT_STR("Game over.\n")
     PRINT_STR("The playing time was ")
     PRINT_REG($t0, 'd')
@@ -665,6 +680,7 @@ _move_snake:
 
 _handle_key_press:
     # Handle user key presses; discard illegal presses (i.e. backwards presses)
+    # Returns 0 iff the key press was illegal or no key was pressed.
 
     # Get the pressed key.
     move $t2, $zero
@@ -764,11 +780,19 @@ _display_splash:
 main:
     jal _display_splash
     init_game()
-    move $s0, $zero
-    BODY:
-        sleep(SLEEP_MS)
-        add $s0, $s0, SLEEP_MS
-        sw $s0, TIME
+    time()
+    move $s0, $v0
+    MAIN_BODY:
+        sleep(TIME_STEP)
         handle_key_press()
-        move_snake()
-    j BODY
+        beq $v0, $zero, TEST_TIME
+            move_snake()
+            time()
+            move $s0, $v0
+            j MAIN_BODY
+        TEST_TIME:
+            time()
+            sub $t0, $v0, $s0
+            blt $t0, TIME_STEP, MAIN_BODY     # Only move if t > TIME_STEP
+                move_snake()
+    j MAIN_BODY
